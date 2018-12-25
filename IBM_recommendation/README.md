@@ -1,13 +1,13 @@
 # Recommendation system for IBM Watson Studio
 
 <p align="center"> 
-<img src="https://github.com/ania4data/Recommendation_systems/IBM_recommendation_system/blob/master/images/ibm-watson.jpg", style="width:30%">
+<img src="https://github.com/ania4data/Recommendation_systems/tree/master/IBM_recommendation/images/ibm-watson.jpg", style="width:30%">
 </p>
 
 In this project I have introduced multiple recommendation systems, including Rank-base (item popularity), User-base (user similarity), Content-base (item similarity, NLP), and SVD (matrix factorization) to study the will be looking at the interactions that users have with articles on the IBM Watson Studio platform. Below you can see an example of what the dashboard could look like displaying articles on the IBM Platform.
 
 <p align="center"> 
-<img src="https://github.com/ania4data/Recommendation_systems/IBM_recommendation_system/blob/master/images/dashboard.png", style="width:30%">
+<img src="https://github.com/ania4data/Recommendation_systems/tree/master/IBM_recommendation/imagesdashboard.png", style="width:30%">
 </p>
 
 # Repository layout
