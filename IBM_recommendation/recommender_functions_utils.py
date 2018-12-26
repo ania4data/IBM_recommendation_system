@@ -59,7 +59,7 @@ def get_top_articles(n, df=df):
 
     return top_articles # Return the top article titles from df (not df_content)
 
-def get_top_article_ids(n, df=df):
+def get_top_article_ids(_id, n, data):
     '''
     INPUT:
     n - (int) the number of top articles to return
@@ -69,12 +69,52 @@ def get_top_article_ids(n, df=df):
     top_articles - (list) A list of the top 'n' article ids
     
     '''
-    df.article_id = df.article_id.astype('int64')
-    ids_list = list(df.groupby(by=['article_id']).count().sort_values(by='title', ascending=False)
-                    .reset_index().iloc[0:n].article_id.values)
-    top_articles = ids_list
+    top_articles = data.iloc[0: n].article_id.values
+
+    # df.article_id = df.article_id.astype('int64')
+    # ids_list = list(df.groupby(by=['article_id']).count().sort_values(by='title', ascending=False)
+    #                 .reset_index().iloc[0:n].article_id.values)
+    # top_articles = ids_list
     
-    return top_articles # Return the top article ids   
+    return top_articles # Return the top article ids 
+
+def get_rank_data(df=df):
+    '''
+    INPUT:
+    df - (pandas dataframe) df as defined at the top of the notebook 
+    
+    OUTPUT:
+    ranked_df - (list) a ranked dataframe sorted by viewership count
+    
+    '''
+    df.article_id = df.article_id.astype('int64')
+    rank_df = list(df.groupby(by=['article_id']).count().sort_values(by='title', ascending=False)
+                    .reset_index().iloc[0:])
+    
+    return rank_df # Return the top article ids 
+
+
+
+def get_article_names(article_ids, df=df):
+    '''
+    INPUT:
+    article_ids - (list) a list of article ids
+    df - (pandas dataframe) df as defined at the top of the notebook
+    
+    OUTPUT:
+    article_names - (list) a list of article names associated with the list of article ids 
+                    (this is identified by the title column)
+    '''
+    article_names = []
+    df_clean_id_title= df[['article_id','title']].drop_duplicates()
+    article_name_df = df_clean_id_title[df_clean_id_title.article_id.isin(article_ids)]
+    
+    for article_id in article_ids:
+        article_names.append(article_name_df[article_name_df['article_id']==article_id].title.values[0])
+
+    return article_names # Return the article names associated with list of article ids
+
+  
 
 
 def create_user_item_matrix(df):
@@ -136,25 +176,6 @@ def find_similar_users(user_id, user_item=user_item):
     
     return most_similar_users, similarity_df  # return a list of the users in order from most to least similar
 
-
-def get_article_names(article_ids, df=df):
-    '''
-    INPUT:
-    article_ids - (list) a list of article ids
-    df - (pandas dataframe) df as defined at the top of the notebook
-    
-    OUTPUT:
-    article_names - (list) a list of article names associated with the list of article ids 
-                    (this is identified by the title column)
-    '''
-    article_names = []
-    df_clean_id_title= df[['article_id','title']].drop_duplicates()
-    article_name_df = df_clean_id_title[df_clean_id_title.article_id.isin(article_ids)]
-    
-    for article_id in article_ids:
-        article_names.append(article_name_df[article_name_df['article_id']==article_id].title.values[0])
-
-    return article_names # Return the article names associated with list of article ids
 
 def get_user_articles(user_id, user_item=user_item):
     '''
