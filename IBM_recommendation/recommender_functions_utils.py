@@ -4,30 +4,39 @@ import matplotlib.pyplot as plt
 import project_tests as t
 import pickle
 from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
-%load_ext autoreload
-%autoreload 2
 from utils import tokenizer
 from collections import Counter
 from scipy import linalg
 
 def load_data(user_article_pth, article_pth):
+    '''
+    INPUT
+    user_article_pth (str)- path to user/article view csv file
+    article_pth (str) - path to article csv file
+    OUTPUT
+    df - user/article dataframe
+    df_content - article dataframe
+    
+    '''
+    df = pd.read_csv(user_article_pth)
+    df_content = pd.read_csv(article_pth)
+    del df['Unnamed: 0']
+    del df_content['Unnamed: 0']
 
-	df = pd.read_csv(user_article_pth)
-	#'data/user-item-interactions.csv'
-	df_content = pd.read_csv(article_pth)
-	#'data/articles_community.csv'
-	del df['Unnamed: 0']
-	del df_content['Unnamed: 0']
+    email_encoded = email_mapper(df)
+    del df['email']
+    df['user_id'] = email_encoded
+    df.article_id = df.article_id.astype('int64')
 
-	email_encoded = email_mapper(data = df)
-	del df['email']
-	df['user_id'] = email_encoded
-	df.article_id = df.article_id.astype('int64')
-
-	return df, df_content
+    return df, df_content
 
 def email_mapper(df):
-
+    '''
+    INPUT
+    df - user/article dataframe
+    OUTPUT
+    email_encoded - (list) of encoded df.email to integer
+    '''   
     coded_dict = dict()
     cter = 1
     email_encoded = []
@@ -40,42 +49,20 @@ def email_mapper(df):
         email_encoded.append(coded_dict[val])
     return email_encoded
 
-def get_top_articles(n, df):
+
+def get_top_article_ids(_id, n, df_ranked):
     '''
     INPUT:
+    _id - (int) user id
     n - (int) the number of top articles to return
-    df - (pandas dataframe) df as defined at the top of the notebook 
-    
-    OUTPUT:
-    top_articles - (list) A list of the top 'n' article titles 
-    
-    '''
-    top_ids_list = get_top_article_ids(n, df)
-    top_n_df = df.groupby(by=['article_id']).count().sort_values(by='title', ascending=False).reset_index().iloc[0:n]
-    top_n_df = top_n_df.reset_index() 
-    unique_id_title = df[['article_id','title']].drop_duplicates()
-    unique_id_title = unique_id_title[unique_id_title.article_id.isin(top_ids_list)]
-    top_articles = list(top_n_df.merge(unique_id_title, on='article_id', suffixes=('_', '')).title.values)
-
-    return top_articles # Return the top article titles from df (not df_content)
-
-def get_top_article_ids(_id, n, data):
-    '''
-    INPUT:
-    n - (int) the number of top articles to return
-    df - (pandas dataframe) df as defined at the top of the notebook 
+    df_ranked - (pandas dataframe) is a ranked df from get_rank_data 
     
     OUTPUT:
     top_articles - (list) A list of the top 'n' article ids
     
     '''
-    top_articles = data.iloc[0: n].article_id.values
+    top_articles = df_ranked.iloc[0: n].article_id.values
 
-    # df.article_id = df.article_id.astype('int64')
-    # ids_list = list(df.groupby(by=['article_id']).count().sort_values(by='title', ascending=False)
-    #                 .reset_index().iloc[0:n].article_id.values)
-    # top_articles = ids_list
-    
     return top_articles # Return the top article ids 
 
 def get_rank_data(df):
@@ -84,12 +71,11 @@ def get_rank_data(df):
     df - (pandas dataframe) df as defined at the top of the notebook 
     
     OUTPUT:
-    ranked_df - (list) a ranked dataframe sorted by viewership count
+    ranked_df - a ranked dataframe sorted by viewership count
     
     '''
     df.article_id = df.article_id.astype('int64')
-    rank_df = list(df.groupby(by=['article_id']).count().sort_values(by='title', ascending=False)
-                    .reset_index().iloc[0:])
+    rank_df = df.groupby(by=['article_id']).count().sort_values(by='title', ascending=False).reset_index().iloc[0:]
     
     return rank_df # Return the top article ids 
 
@@ -115,7 +101,6 @@ def get_article_names(article_ids, df):
     return article_names # Return the article names associated with list of article ids
 
   
-
 
 def create_user_item_matrix(df):
     '''
@@ -177,10 +162,11 @@ def find_similar_users(user_id, user_item):
     return most_similar_users, similarity_df  # return a list of the users in order from most to least similar
 
 
-def get_user_articles(user_id, user_item):
+def get_user_articles(user_id, df, user_item):
     '''
     INPUT:
     user_id - (int) a user id
+    df - dataframe of user/aricle view
     user_item - (pandas dataframe) matrix of users by articles: 
                 1's when a user has interacted with an article, 0 otherwise
     
@@ -194,14 +180,15 @@ def get_user_articles(user_id, user_item):
     '''
     df_user = user_item.loc[user_id]
     article_ids = list(df_user[df_user!=0.0].index)
-    article_names = get_article_names(article_ids, df=df)
+    article_names = get_article_names(article_ids, df)
     
     return article_ids, article_names # return the ids and names
 
-def user_user_recs(user_id, user_item, m=10):
+def user_user_recs(user_id, df, user_item, m):
     '''
     INPUT:
     user_id - (int) a user id
+    df - dataframe of user/aricle view
     m - (int) the number of recommendations you want for the user
     
     OUTPUT:
@@ -222,7 +209,7 @@ def user_user_recs(user_id, user_item, m=10):
     recs = []
     all_articles = list(user_item.columns)
     user1 = user_id
-    article_ids_user1_seen, _ = get_user_articles(user1, user_item)
+    article_ids_user1_seen, _ = get_user_articles(user1, df, user_item)
     
     most_similar_users, similarity_df = find_similar_users(user1, user_item)
     x = similarity_df.sort_values(by='similarity', ascending=False)
@@ -237,7 +224,7 @@ def user_user_recs(user_id, user_item, m=10):
         # arbitary pick next user, with same similarities
         random_pick_similar = np.random.choice(user2_list, unique_length, replace=False)
         for user2 in random_pick_similar:
-            article_ids_user2_seen, _ = get_user_articles(user2, user_item)
+            article_ids_user2_seen, _ = get_user_articles(user2, df, user_item)
             article_ids_user1_notseen = np.setdiff1d(article_ids_user2_seen, article_ids_user1_seen)
             start_length = len(recs)
             # to avoid similar pointer,recs_tmp should not point same place as recs, so need only copy
@@ -265,7 +252,7 @@ def get_top_sorted_users(user_id, df, user_item):
     '''
     INPUT:
     user_id - (int)
-    df - (pandas dataframe) df as defined at the top of the notebook 
+    df - dataframe of user/aricle view
     user_item - (pandas dataframe) matrix of users by articles: 
             1's when a user has interacted with an article, 0 otherwise
     
@@ -296,10 +283,13 @@ def get_top_sorted_users(user_id, df, user_item):
     
     return neighbors_df # Return the dataframe specified in the doc_string
 
-def user_user_recs_part2(user_id, user_item, df, m=10):
+def user_user_recs_part2(user_id, user_item, df, m):
     '''
     INPUT:
     user_id - (int) a user id
+    user_item - (pandas dataframe) matrix of users by articles: 
+            1's when a user has interacted with an article, 0 otherwise    
+    df - dataframe of user/aricle view   
     m - (int) the number of recommendations you want for the user
     
     OUTPUT:
@@ -322,14 +312,18 @@ def user_user_recs_part2(user_id, user_item, df, m=10):
     recs = []
     all_articles = list(user_item.columns)
     user1 = user_id
-    article_ids_user1_seen, _ = get_user_articles(user1, user_item)
+    article_ids_user1_seen, _ = get_user_articles(user1, df, user_item)
+    ranked_df = get_rank_data(df)
+    #print(article_ids_user1_seen)
     
     neighbors_df = get_top_sorted_users(user1, df, user_item)
     user2_list = neighbors_df.user2.values
+    #print(user2_list)
 
     for user2 in user2_list:
-        article_ids_user2_seen, _ = get_user_articles(user2, user_item)
+        article_ids_user2_seen, _ = get_user_articles(user2, df, user_item)
         article_ids_user1_notseen = np.setdiff1d(article_ids_user2_seen, article_ids_user1_seen)
+        #print(article_ids_user1_notseen)
         start_length = len(recs)
         # to avoid similar pointer,recs_tmp should not point same place as recs, so need only copy
         recs_tmp = recs.copy()   
@@ -339,14 +333,15 @@ def user_user_recs_part2(user_id, user_item, df, m=10):
 
         if(end_length>=m):
             extra_count_needed = m - start_length
-            top_100_articles = get_top_article_ids(100, df)
+            top_100_articles = get_top_article_ids(user_id, 1000, ranked_df)
             list1_df = pd.DataFrame(np.array(top_100_articles))
             list2_df = pd.DataFrame(np.array(article_ids_user1_notseen))
             # intersection of the two lists but with top_100_priority and get extra_count_needed from top
             list_get_rest = list1_df.merge(list2_df)[0].values[0:extra_count_needed]            
             recs.extend(list_get_rest)
             recs = list(set(recs))
-            rec_names = get_article_names(recs)
+            rec_names = get_article_names(recs, df)
+            #print(recs, rec_names)
             return recs, rec_names
 
         if(end_length<m):
@@ -354,7 +349,7 @@ def user_user_recs_part2(user_id, user_item, df, m=10):
             recs = list(set(recs))
 
     #if user never meet m recommendation
-    rec_names = get_article_names(recs)
+    rec_names = get_article_names(recs, df)
     return recs, rec_names
 
 def get_token_df_content(df_content_clean_copy):
@@ -392,8 +387,7 @@ def token_length(df_content_clean_copy, content_tokens_dict):
     '''
     INPUT:
     df_content_clean_copy - a dataframe of article description,
-    with unique article id
-    
+    with unique article id 
     content_tokens_dict - (dictionary) a dictionary that connect the article_id 
     to tokens 
     
@@ -408,40 +402,52 @@ def token_length(df_content_clean_copy, content_tokens_dict):
             print(content_tokens_dict[article])
     return len_token
 
-def get_bag_words_vec(df_content_clean_copy, content_tokens_dict)
+def get_bag_words_vec(df_content_clean_copy, content_tokens_dict):
+    '''
+    INPUT:
+    df_content_clean_copy - a dataframe of article description,
+    with unique article id 
+    content_tokens_dict - (dictionary) a dictionary that connect the article_id 
+    to tokens 
+    OUTPUT:
+    article_bag_of_words_vec -  a dictionary for every article to a bag of words vector
+    with length of global_words_update length
+    global_words_update - (list) a list of global unique tokens
+    content_tokens_dict_update_1 - a dictionary for each article_id to a bag of words   
+    '''
+    global_words = []
+    for article in df_content_clean_copy.article_id.values:
+        global_words.extend(content_tokens_dict[article])
+    global_words_counter = Counter(global_words)
 
-	global_words = []
-	for article in df_content_clean_copy.article_id.values:
-	    global_words.extend(content_tokens_dict[article])
-	global_words_counter = Counter(global_words)
+    count = 0
+    content_tokens_dict_update_1 = {}
+    for article in df_content_clean_copy.article_id.values:
+        tokens = content_tokens_dict[article]
+        tokens_update_1 = []
+        for token in tokens:
+            if(global_words_counter[token]>1):
+                tokens_update_1.append(token)
+        content_tokens_dict_update_1[article] =  tokens_update_1  
 
-	count = 0
-	content_tokens_dict_update_1 = {}
-	for article in df_content_clean_copy.article_id.values:
-	    tokens = content_tokens_dict[article]
-	    tokens_update_1 = []
-	    for token in tokens:
-	        if(global_words_counter[token]>1):
-	            tokens_update_1.append(token)
-	    content_tokens_dict_update_1[article] =  tokens_update_1  
+    global_words_update = []
+    for article in df_content_clean_copy.article_id.values:
+        global_words_update.extend(content_tokens_dict_update_1[article])
+    global_words_update = list(set(global_words_update))
 
-	global_words_update = []
-	for article in df_content_clean_copy.article_id.values:
-	    global_words_update.extend(content_tokens_dict_update_1[article])
+    article_bag_of_words_vec = {}
+    for article in df_content_clean_copy.article_id.values:
+        bag_of_words_coded = np.zeros(len(global_words_update))
+        tokens = content_tokens_dict_update_1[article]
+        for token in tokens:
+            idx = global_words_update.index(token)
+            bag_of_words_coded[idx] = 1.0
+        article_bag_of_words_vec[article] = bag_of_words_coded  
 
-	article_bag_of_words_vec = {}
-	for article in df_content_clean_copy.article_id.values:
-	    bag_of_words_coded = np.zeros(len(global_words_update))
-	    tokens = content_tokens_dict_update_1[article]
-	    for token in tokens:
-	        idx = global_words_update.index(token)
-	        bag_of_words_coded[idx] = 1.0
-	    article_bag_of_words_vec[article] = bag_of_words_coded  
-
-	return article_bag_of_words_vec, global_words_update, content_tokens_dict_update_1
+    return article_bag_of_words_vec, global_words_update, content_tokens_dict_update_1
 
 
-def rec_ranked_word_specific(global_words_update, content_tokens_dict_update_1, df, word_filter='visualization', n_rec=10):
+def rec_ranked_word_specific(global_words_update, content_tokens_dict_update_1, df, n_rec, word_filter='visualization'):
     '''
     INPUT:
     global_words_update - (list) a list of global unique tokens
@@ -478,11 +484,11 @@ def rec_ranked_word_specific(global_words_update, content_tokens_dict_update_1, 
             article_view_count = merged_article_found_df_count.total_view_count.values
             print('top {} viewed articles with word {}, \n'.format(n_rec, word_filter))
             print('------------')
-            print('Article ids:\n', article_ids_output)
+            print('Article ids:\n', article_ids_output[0: n_rec])
             print('------------')
-            print('Article names:\n', get_article_names(article_ids_output))
+            print('Article names:\n', get_article_names(article_ids_output[0: n_rec], df))
             print('------------')
-            print('Article total view count: \n', article_view_count)
+            print('Article total view count: \n', article_view_count[0: n_rec])
             top_df_filtered = merged_article_found_df_count[0: n_rec]
             return  top_df_filtered
        
@@ -530,7 +536,7 @@ def find_similar_articles(article_id, bag_words_dict_vec, df):
         return None
 
 
-def make_content_recs(article_id, bag_words_dict_vec, df, n_rec=10):
+def make_content_recs(article_id, bag_words_dict_vec, df, df_content_clean, n_rec):
     '''
     INPUT:
     user_id - (int)  user_id 
@@ -549,11 +555,21 @@ def make_content_recs(article_id, bag_words_dict_vec, df, n_rec=10):
     Note:
     user_id has no active impact on suggestion, this role is given to article_id
     '''
+
     try:
-        
-        rec_ids = find_similar_articles(article_id, bag_words_dict_vec, df)[0: n_rec]\
-                  .article2.values
-        rec_names = get_article_names(rec_ids)
-        return rec_ids, rec_names
+        #print(df_content_clean.head(10))
+        rec_target_name = df_content_clean[df_content_clean['article_id']==article_id].doc_full_name.values
+        #print(rec_target_name)
+
+        try:
+
+            print('Top {} articles similar to id/name: {}/{} are:\n'.format(n_rec, article_id, rec_target_name))                         
+            rec_ids = find_similar_articles(article_id, bag_words_dict_vec, df)[0: n_rec]\
+                      .article2.values
+            rec_names = get_article_names(rec_ids, df)
+            return rec_ids, rec_names
+        except:
+            return None
     except:
+        print('Pick another id, article not in the df_content')
         return None
