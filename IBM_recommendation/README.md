@@ -43,7 +43,7 @@ In this project I have introduced multiple recommendation systems, including Ran
 
 - data folder: two csv files `user-item-interactions.csv` for user/article interaction and `articles_community.csv` which contains information with regard to articles.
 - images folder: contains all static images for README.md file
-- utils folder: contains the `tokenizer.py` file for tokenizing input text
+- utils folder: contains the `tokenizer.py` file for preprocessing/tokenizing input text
 - LICENSE file
 - README.md file
 - test files: `top_*.p files`/`user_item_matrix.p` and `project_tests.py` for tests running through the notebook
