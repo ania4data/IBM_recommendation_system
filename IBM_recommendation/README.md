@@ -49,7 +49,7 @@ In this project I have introduced multiple recommendation systems, including Ran
 - test files: `top_*.p files`/`user_item_matrix.p` and `project_tests.py` for tests running through the notebook
 - Jupter notebook: `Recommendations_with_IBM.ipynb` contains recommendations notebook
 - `recommender.py`: is the conversion of the notebook file into the class 
-    - for Users: user-base (user similarity), rank-base (popularity), rank-content-base (popularity/keyword/NLP)
+    - for Users: user-base (user similarity), rank-base (item popularity), rank-content-base (item popularity with keyword/NLP)
     - for Items: content-base(article similarity/NLP)
 - `recommender_functions_utils.py`: all necessary functions for `recommender.py` gathered here
 
