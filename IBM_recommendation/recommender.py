@@ -82,6 +82,7 @@ class Recommender():
         '''
         self.df = df
         self.df_content = df_content
+        self.df_content_clean = self.df_content.drop_duplicates(subset=['article_id','doc_full_name', 'doc_status'])
 
         self.train_user_item = self.reviews[['user_id', 'movie_id', 'rating', 'timestamp']]
         movie_content = np.array(self.movies.iloc[:,4:])
@@ -93,23 +94,22 @@ class Recommender():
         if(self._idtype == 'user'):
             if((self.method == 'rank-base') or (self.method == 'rank-base-content')):
                 self.ranked_df = rf.get_rank_data(df=self.df)
-
+            if((self.method == 'rank-base-content')):
+                self.content_tokens_dict = rf.get_token_df_content(self.df_content_clean)
+                self.len_token = rf.token_length(self.df_content_clean, self.content_tokens_dict)  ##??
+                self.article_bag_of_words_vec, self.global_words_update, self.content_tokens_dict_update_1 = rf.get_bag_words_vec(self.df_content_clean, self.content_tokens_dict)
+s
             if((self.method == 'user-base')):
                 self.user_item, self.user_item_matrix = rf.create_user_item_matrix(df=self.df)
 
                 # user/movie matrix with rating in bulk
-                self.train_data_df = self.train_user_item.groupby(['user_id', 'movie_id'])['rating'].max().unstack()
-                self.user_ids_series = np.array(self.train_data_df.index)
-                #print(8 in self.user_ids_series)
-                self.movie_ids_series = np.array(self.train_data_df.columns)
-                self.train_data_np = np.array(self.train_data_df)
-                self.user_mat, self.movie_mat = rf.FunkSVD(self.train_data_np, self.latent_features, self.learning_rate, self.iters, self.print_every)
 
-        if(self._idtype == 'movie'):
+
+        if(self._idtype == 'item'):
             if(self.method == 'content-base'):
-                dot_prod_movies = movie_content.dot(np.transpose(movie_content))
-                self.movie_ids_list = self.movies.movie_id.values
-                self.dot_prod_movies_df = pd.DataFrame(dot_prod_movies, columns=self.movie_ids_list, index=self.movie_ids_list)           
+                self.content_tokens_dict = rf.get_token_df_content(self.df_content_clean)
+                self.article_bag_of_words_vec, self.global_words_update, self.content_tokens_dict_update_1 = rf.get_bag_words_vec(self.df_content_clean, self.content_tokens_dict)
+s
 
 
     def make_recommendations(self, _id):
@@ -130,21 +130,35 @@ class Recommender():
         if(self._idtype == 'user'):
             if(self.method=='rank-base'):
                 
-                self.rec_ids = rf.get_top_article_ids(_id, n=self.rec_num, data=self.ranked_df)
+                self.rec_ids = rf.get_top_article_ids(_id, self.rec_num, self.ranked_df)
             # create some surprise
                 #self.rec_ids = np.random.choice(rec_ids_tmp, self.rec_num, replace=False)
                 self.rec_names = rf.get_article_names(self.rec_ids, df=self.df)
 
-            if(self.method=='funk-SVD'):
+            if(self.method=='rank-base-content'):
+                self.top_df_filtered = rec_ranked_word_specific(self.global_words_update, self.content_tokens_dict_update_1, selg.df, word_filter='visualization', self.rec_num)
 
-                if(_id in self.user_ids_series):
-                    #funk svd recomm
-                    user_unseen_movie_id = rf.svd_recommendation(_id, self.train_data_df, self.user_mat, self.movie_mat, self.rec_num)
-                    self.rec_ids = np.random.choice(user_unseen_movie_id, self.rec_num, replace=False)
-                    self.rec_names = rf.get_movie_names(self.rec_ids, self.movies)
-                else:
-                    print('user_id: {} not found, try another one'.format(_id))
-                    return None                
+
+            if(self.method=='user-base'):
+
+                self.most_similar_users, self.similarity_df = rf.find_similar_users(_id, self.user_item) # ???
+                self.recs, self.rec_names = rf.user_user_recs_part2(_id, self.user_item, self.df, self.rec_num)
+
+
+        if(self._idtype == 'item'):
+            if(self.method=='content-base'):
+                self.rec_ids, self.rec_names = rf.make_content_recs(_id, self.article_bag_of_words_vec, self.df, self.rec_num)
+
+            # if(self.method=='funk-SVD'):
+
+            #     if(_id in self.user_ids_series):
+            #         #funk svd recomm
+            #         user_unseen_movie_id = rf.svd_recommendation(_id, self.train_data_df, self.user_mat, self.movie_mat, self.rec_num)
+            #         self.rec_ids = np.random.choice(user_unseen_movie_id, self.rec_num, replace=False)
+            #         self.rec_names = rf.get_movie_names(self.rec_ids, self.movies)
+            #     else:
+            #         print('user_id: {} not found, try another one'.format(_id))
+            #         return None                
 
 
 if __name__ == '__main__':
