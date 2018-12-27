@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 import project_tests as t
 import pickle
 from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
-%load_ext autoreload
-%autoreload 2
 from utils import tokenizer
 from collections import Counter
 from scipy import linalg
@@ -18,7 +16,7 @@ class Recommender():
     as well as content-base method for movies to make recommnedation. 
     Also uses either FunkSVD or mix method to make prediction on review rating for particular user and movie. 
     '''
-    def __init__(self, method='user-base', _idtype='user', latent_features=12, learning_rate=0.0001, iters=500, rec_num=5, print_every=10):
+    def __init__(self, method='user-base', _idtype='user', rec_num=10, word_filter='visualization'):
         '''
         This function initialize the class
         INPUT:
@@ -26,44 +24,12 @@ class Recommender():
         _idtype - (str) 'user' or 'item'
                         'user' only compatible with 'user-base'/'rank-base'/'rank-base-content' methods
                         'item' only compatible with 'content-base' methods
-
-        latent_features - (int) the number of latent features used in 'mix'/funk-SVD' methods
-        learning_rate - (float) the learning rate in 'mix'/funk-SVD' methods
-        iters - (int) the number of iterations in 'mix'/funk-SVD' methods
         rec_num - (int) number of recommendations for output
-        print_every - (int) interval between prints in 'mix'/funk-SVD' methods
-
-        OUTPUT:
-        None - stores the following as attributes:
-        method - (str) 'mix': funk-SVD+rank-base, 'funk-SVD', 'rank-base', 'content-base'
-        _idtype - (str) 'user' or 'movie'
-                        'user' only compatible with 'mix'/'funk-SVD'/'rank-base' methods
-                        'movie' only compatible with 'content-base' methods
-
-        latent_features - (int) the number of latent features used in 'mix'/funk-SVD' methods
-        learning_rate - (float) the learning rate in 'mix'/funk-SVD' methods
-        iters - (int) the number of iterations in 'mix'/funk-SVD' methods
-        rec_num - (int) number of recommendations for output
-        print_every - (int) interval between prints in 'mix'/funk-SVD' methods
-        review - review dataframe
-        movies - movies dataframe
-        train_user_item - reviews with fewer columns
-        movie_ids_list - list of movies in movies dataframe
-        user_ids_series - list of users in review datafarame
-        movie_ids_series - list of movies in review dataframe
-        dot_prod_movies_df - movie similarity (dot product) of categories in dataframe
-        ranked_movies - review-movie join dataframe ordered by abg rating, date, with more than 4 review
-        user_mat - user * latent_feature matrix from SVD/mix
-        movie_mat -  latent_feature * movie matrix from SVD/mix
         '''
-
         self.method = method
         self._idtype = _idtype
-        self.latent_features = latent_features
-        self.learning_rate = learning_rate
-        self.iters = iters
         self.rec_num = rec_num
-        self.print_every = print_every
+        self.word_filter = word_filter
 
         if((self._idtype == 'user') and (self.method not in ['user-base', 'rank-base', 'rank-base-content'])):
             print("For 'user' idtype must initialize with one of 'user-base'/'rank-base'/'rank-base-content' methods")
@@ -84,8 +50,6 @@ class Recommender():
         self.df_content = df_content
         self.df_content_clean = self.df_content.drop_duplicates(subset=['article_id','doc_full_name', 'doc_status'])
 
-        self.train_user_item = self.reviews[['user_id', 'movie_id', 'rating', 'timestamp']]
-        movie_content = np.array(self.movies.iloc[:,4:])
         print('Fitting .......')
         print('Method: {} id_type: {}'.format(self.method, self._idtype))
         print()
@@ -98,18 +62,15 @@ class Recommender():
                 self.content_tokens_dict = rf.get_token_df_content(self.df_content_clean)
                 self.len_token = rf.token_length(self.df_content_clean, self.content_tokens_dict)  ##??
                 self.article_bag_of_words_vec, self.global_words_update, self.content_tokens_dict_update_1 = rf.get_bag_words_vec(self.df_content_clean, self.content_tokens_dict)
-s
+
             if((self.method == 'user-base')):
-                self.user_item, self.user_item_matrix = rf.create_user_item_matrix(df=self.df)
-
-                # user/movie matrix with rating in bulk
-
+                self.user_item, self.user_item_matrix = rf.create_user_item_matrix(self.df)
 
         if(self._idtype == 'item'):
             if(self.method == 'content-base'):
                 self.content_tokens_dict = rf.get_token_df_content(self.df_content_clean)
                 self.article_bag_of_words_vec, self.global_words_update, self.content_tokens_dict_update_1 = rf.get_bag_words_vec(self.df_content_clean, self.content_tokens_dict)
-s
+
 
 
     def make_recommendations(self, _id):
@@ -131,45 +92,49 @@ s
             if(self.method=='rank-base'):
                 
                 self.rec_ids = rf.get_top_article_ids(_id, self.rec_num, self.ranked_df)
-            # create some surprise
-                #self.rec_ids = np.random.choice(rec_ids_tmp, self.rec_num, replace=False)
-                self.rec_names = rf.get_article_names(self.rec_ids, df=self.df)
+                self.rec_names = rf.get_article_names(self.rec_ids, self.df)
+                return self.rec_ids, self.rec_names
 
             if(self.method=='rank-base-content'):
-                self.top_df_filtered = rec_ranked_word_specific(self.global_words_update, self.content_tokens_dict_update_1, selg.df, word_filter='visualization', self.rec_num)
-
+                self.top_df_filtered = rf.rec_ranked_word_specific(self.global_words_update, self.content_tokens_dict_update_1, self.df, self.rec_num, self.word_filter)
+                return self.top_df_filtered
 
             if(self.method=='user-base'):
 
-                self.most_similar_users, self.similarity_df = rf.find_similar_users(_id, self.user_item) # ???
-                self.recs, self.rec_names = rf.user_user_recs_part2(_id, self.user_item, self.df, self.rec_num)
+                self.most_similar_users, self.similarity_df = rf.find_similar_users(_id, self.user_item) 
+                self.rec_ids, self.rec_names = rf.user_user_recs_part2(_id, self.user_item, self.df, self.rec_num)
+                return self.rec_ids, self.rec_names
 
 
         if(self._idtype == 'item'):
             if(self.method=='content-base'):
-                self.rec_ids, self.rec_names = rf.make_content_recs(_id, self.article_bag_of_words_vec, self.df, self.rec_num)
-
-            # if(self.method=='funk-SVD'):
-
-            #     if(_id in self.user_ids_series):
-            #         #funk svd recomm
-            #         user_unseen_movie_id = rf.svd_recommendation(_id, self.train_data_df, self.user_mat, self.movie_mat, self.rec_num)
-            #         self.rec_ids = np.random.choice(user_unseen_movie_id, self.rec_num, replace=False)
-            #         self.rec_names = rf.get_movie_names(self.rec_ids, self.movies)
-            #     else:
-            #         print('user_id: {} not found, try another one'.format(_id))
-            #         return None                
-
+                self.rec_ids, self.rec_names = rf.make_content_recs(_id, self.article_bag_of_words_vec, self.df, self.df_content_clean, self.rec_num)
+                return self.rec_ids, self.rec_names
 
 if __name__ == '__main__':
-    # test different parts to make sure it works
 
     df, df_content = rf.load_data('data/user-item-interactions.csv', 'data/articles_community.csv')
+    # print(df.head(2))
+    # print(df_content.head(2))
 
-    # Method user-base
-    print('Method mix-------------------------------------------------')
+    print('Method user-base-------------------------------------------------')
     rec = Recommender(method='user-base')
-    #print('here')
-    rec.fit(movies=movies_, reviews=reviews_)
-    print(rec.make_recommendations(8))  # in data
-    print(rec.make_recommendations(1))  # not in data
+    rec.fit(df_content, df)
+    ids, names = rec.make_recommendations(1)
+    print(ids, names)  
+
+    print('Method rank-base-------------------------------------------------')
+    rec = Recommender(method='rank-base', rec_num=5)
+    rec.fit(df_content, df)
+    ids, names = rec.make_recommendations(1)
+    print(ids, names)  
+
+    print('Method rank-content-base-------------------------------------------------')
+    rec = Recommender(method='rank-base-content', rec_num=10, word_filter='flow')
+    rec.fit(df_content, df)
+    print(rec.make_recommendations(10))  
+
+    print('Method content-base-------------------------------------------------')
+    rec = Recommender(method='content-base', _idtype='item', rec_num=10)
+    rec.fit(df_content, df)
+    print(rec.make_recommendations(100))  
