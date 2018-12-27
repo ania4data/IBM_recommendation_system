@@ -26,7 +26,7 @@ def load_data(user_article_pth, article_pth):
 
 	return df, df_content
 
-def email_mapper(data = df):
+def email_mapper(df):
 
     coded_dict = dict()
     cter = 1
@@ -40,7 +40,7 @@ def email_mapper(data = df):
         email_encoded.append(coded_dict[val])
     return email_encoded
 
-def get_top_articles(n, df=df):
+def get_top_articles(n, df):
     '''
     INPUT:
     n - (int) the number of top articles to return
@@ -78,7 +78,7 @@ def get_top_article_ids(_id, n, data):
     
     return top_articles # Return the top article ids 
 
-def get_rank_data(df=df):
+def get_rank_data(df):
     '''
     INPUT:
     df - (pandas dataframe) df as defined at the top of the notebook 
@@ -95,7 +95,7 @@ def get_rank_data(df=df):
 
 
 
-def get_article_names(article_ids, df=df):
+def get_article_names(article_ids, df):
     '''
     INPUT:
     article_ids - (list) a list of article ids
@@ -145,7 +145,7 @@ def create_user_item_matrix(df):
     return user_item, user_item_matrix # return the user_item matrix 
 
 
-def find_similar_users(user_id, user_item=user_item):
+def find_similar_users(user_id, user_item):
     '''
     INPUT:
     user_id - (int) a user_id
@@ -177,7 +177,7 @@ def find_similar_users(user_id, user_item=user_item):
     return most_similar_users, similarity_df  # return a list of the users in order from most to least similar
 
 
-def get_user_articles(user_id, user_item=user_item):
+def get_user_articles(user_id, user_item):
     '''
     INPUT:
     user_id - (int) a user id
@@ -198,7 +198,7 @@ def get_user_articles(user_id, user_item=user_item):
     
     return article_ids, article_names # return the ids and names
 
-def user_user_recs(user_id, m=10):
+def user_user_recs(user_id, user_item, m=10):
     '''
     INPUT:
     user_id - (int) a user id
@@ -222,9 +222,9 @@ def user_user_recs(user_id, m=10):
     recs = []
     all_articles = list(user_item.columns)
     user1 = user_id
-    article_ids_user1_seen, _ = get_user_articles(user1, user_item=user_item)
+    article_ids_user1_seen, _ = get_user_articles(user1, user_item)
     
-    most_similar_users, similarity_df = find_similar_users(user1, user_item=user_item)
+    most_similar_users, similarity_df = find_similar_users(user1, user_item)
     x = similarity_df.sort_values(by='similarity', ascending=False)
     # get unique, then go through uniques if multiple and pick random from them
     unique_sim = x.similarity.unique()   
@@ -237,7 +237,7 @@ def user_user_recs(user_id, m=10):
         # arbitary pick next user, with same similarities
         random_pick_similar = np.random.choice(user2_list, unique_length, replace=False)
         for user2 in random_pick_similar:
-            article_ids_user2_seen, _ = get_user_articles(user2, user_item=user_item)
+            article_ids_user2_seen, _ = get_user_articles(user2, user_item)
             article_ids_user1_notseen = np.setdiff1d(article_ids_user2_seen, article_ids_user1_seen)
             start_length = len(recs)
             # to avoid similar pointer,recs_tmp should not point same place as recs, so need only copy
@@ -261,7 +261,7 @@ def user_user_recs(user_id, m=10):
     # user never meet required m rec
     return recs
    
-def get_top_sorted_users(user_id, df=df, user_item=user_item):
+def get_top_sorted_users(user_id, df, user_item):
     '''
     INPUT:
     user_id - (int)
@@ -288,7 +288,7 @@ def get_top_sorted_users(user_id, df=df, user_item=user_item):
     x = df.groupby(by='user_id').count() 
     overall_total = x.reset_index()[['user_id','article_id']].rename(columns={"article_id": "overall_total"})
     merged_counts = unique_total.merge(overall_total, on='user_id')
-    _, similarity_df = find_similar_users(user_id, user_item=user_item)
+    _, similarity_df = find_similar_users(user_id, user_item)
     z = similarity_df.merge(merged_counts, left_on='user2',right_on='user_id').drop(columns=['user_id'])
     # put priority by overall total (test staisfaction, otherwise think unique total count is more important)
     z = z.sort_values(by=['similarity','overall_total','unique_total'],ascending=False) 
@@ -296,7 +296,7 @@ def get_top_sorted_users(user_id, df=df, user_item=user_item):
     
     return neighbors_df # Return the dataframe specified in the doc_string
 
-def user_user_recs_part2(user_id, m=10):
+def user_user_recs_part2(user_id, user_item, df, m=10):
     '''
     INPUT:
     user_id - (int) a user id
@@ -322,13 +322,13 @@ def user_user_recs_part2(user_id, m=10):
     recs = []
     all_articles = list(user_item.columns)
     user1 = user_id
-    article_ids_user1_seen, _ = get_user_articles(user1, user_item=user_item)
+    article_ids_user1_seen, _ = get_user_articles(user1, user_item)
     
-    neighbors_df = get_top_sorted_users(user1, df=df, user_item=user_item)
+    neighbors_df = get_top_sorted_users(user1, df, user_item)
     user2_list = neighbors_df.user2.values
 
     for user2 in user2_list:
-        article_ids_user2_seen, _ = get_user_articles(user2, user_item=user_item)
+        article_ids_user2_seen, _ = get_user_articles(user2, user_item)
         article_ids_user1_notseen = np.setdiff1d(article_ids_user2_seen, article_ids_user1_seen)
         start_length = len(recs)
         # to avoid similar pointer,recs_tmp should not point same place as recs, so need only copy
@@ -339,7 +339,7 @@ def user_user_recs_part2(user_id, m=10):
 
         if(end_length>=m):
             extra_count_needed = m - start_length
-            top_100_articles = get_top_article_ids(100, df=df)
+            top_100_articles = get_top_article_ids(100, df)
             list1_df = pd.DataFrame(np.array(top_100_articles))
             list2_df = pd.DataFrame(np.array(article_ids_user1_notseen))
             # intersection of the two lists but with top_100_priority and get extra_count_needed from top
@@ -388,7 +388,7 @@ def get_token_df_content(df_content_clean_copy):
             break
     return content_tokens_dict
 
-def token_length(df_content_clean_copy, dict_ = content_tokens_dict):
+def token_length(df_content_clean_copy, content_tokens_dict):
     '''
     INPUT:
     df_content_clean_copy - a dataframe of article description,
@@ -403,12 +403,12 @@ def token_length(df_content_clean_copy, dict_ = content_tokens_dict):
     '''    
     len_token = []
     for article in df_content_clean_copy.article_id.values:
-        len_token.append(len(dict_[article]))
-        if(len(dict_[article])==1):
-            print(dict_[article])
+        len_token.append(len(content_tokens_dict[article]))
+        if(len(content_tokens_dict[article])==1):
+            print(content_tokens_dict[article])
     return len_token
 
-def get_bag_words_vec(df_content_clean_copy)
+def get_bag_words_vec(df_content_clean_copy, content_tokens_dict)
 
 	global_words = []
 	for article in df_content_clean_copy.article_id.values:
@@ -438,10 +438,10 @@ def get_bag_words_vec(df_content_clean_copy)
 	        bag_of_words_coded[idx] = 1.0
 	    article_bag_of_words_vec[article] = bag_of_words_coded  
 
-	return article_bag_of_words_vec, global_words_update
+	return article_bag_of_words_vec, global_words_update, content_tokens_dict_update_1
 
 
-def rec_ranked_word_specific(global_words_update, content_tokens_dict_update_1, df=df, word_filter='visualization', n_rec=10):
+def rec_ranked_word_specific(global_words_update, content_tokens_dict_update_1, df, word_filter='visualization', n_rec=10):
     '''
     INPUT:
     global_words_update - (list) a list of global unique tokens
@@ -492,7 +492,7 @@ def rec_ranked_word_specific(global_words_update, content_tokens_dict_update_1, 
         print('Try another word')
         
 
-def find_similar_articles(article_id, bag_words_dict_vec=article_bag_of_words_vec, df=df):
+def find_similar_articles(article_id, bag_words_dict_vec, df):
     '''
     INPUT:
     article_id - (int) a article_id from df_content
@@ -530,7 +530,7 @@ def find_similar_articles(article_id, bag_words_dict_vec=article_bag_of_words_ve
         return None
 
 
-def make_content_recs(user_id, article_id, bag_words_dict_vec=article_bag_of_words_vec, df=df, n_rec=10):
+def make_content_recs(article_id, bag_words_dict_vec, df, n_rec=10):
     '''
     INPUT:
     user_id - (int)  user_id 
@@ -551,7 +551,7 @@ def make_content_recs(user_id, article_id, bag_words_dict_vec=article_bag_of_wor
     '''
     try:
         
-        rec_ids = find_similar_articles(article_id, bag_words_dict_vec=article_bag_of_words_vec, df=df)[0: n_rec]\
+        rec_ids = find_similar_articles(article_id, bag_words_dict_vec, df)[0: n_rec]\
                   .article2.values
         rec_names = get_article_names(rec_ids)
         return rec_ids, rec_names
