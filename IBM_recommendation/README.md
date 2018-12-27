@@ -18,6 +18,8 @@ In this project I have introduced multiple recommendation systems, including Ran
 │   README.md
 │   Recommendations_with_IBM.html
 │   Recommendations_with_IBM.ipynb
+│   recommender.py
+│   recommender_functions_utils.py
 │   top_10.p
 │   top_20.p
 │   top_5.p
@@ -44,5 +46,14 @@ In this project I have introduced multiple recommendation systems, including Ran
 - utils folder: contains the `tokenizer.py` file for tokenizing input text
 - LICENSE file
 - README.md file
-- test files: `top_*.py files` and `project_tests.py` for tests running through the notebook
+- test files: `top_*.p files`/`user_item_matrix.p` and `project_tests.py` for tests running through the notebook
 - Jupter notebook: `Recommendations_with_IBM.ipynb` contains recommendations notebook
+- `recommender.py`: is the conversion of the notebook file into the class 
+			- for Users: user-base (user similarity), rank-base (popularity), rank-content-base (popularity/keyword/NLP)
+			- for Items: content-base(article similarity/NLP)
+- `recommender_functions_utils.py`: all necessary functions for `recommender.py` gathered here
+
+## How to run:
+
+- clone the repository, `git clone https://github.com/ania4data/Recommendation_systems.git`
+- within IBM_recommendation directory, run `python recommender.py`
